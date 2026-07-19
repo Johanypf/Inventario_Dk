@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import type { Session, CountWithProduct } from '@/lib/types'
 
 export default function AdminPage() {
@@ -74,21 +74,27 @@ export default function AdminPage() {
   }, [])
 
   async function loadSessions() {
-    const { data } = await supabase
-      .from('sessions')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (data) setSessions(data)
+    try {
+      const { data } = await getSupabase().from('sessions')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (data) setSessions(data)
+    } catch (e) {
+      console.error('Error cargando sesiones:', e)
+    }
   }
 
   async function loadCounts(sessionId: string) {
-    const { data } = await supabase
-      .from('counts')
-      .select('*, products(*)')
-      .eq('session_id', sessionId)
-      .order('updated_at', { ascending: false })
+    try {
+      const { data } = await getSupabase().from('counts')
+        .select('*, products(*)')
+        .eq('session_id', sessionId)
+        .order('updated_at', { ascending: false })
 
-    if (data) setCounts(data as unknown as CountWithProduct[])
+      if (data) setCounts(data as unknown as CountWithProduct[])
+    } catch (e) {
+      console.error('Error cargando conteos:', e)
+    }
   }
 
   function parseCSV(text: string): { code: string; barcode: string; description: string }[] {
@@ -127,7 +133,7 @@ export default function AdminPage() {
     let ok = 0
 
     for (const p of products) {
-      const { error } = await supabase.from('products').upsert(
+      const { error } = await getSupabase().from('products').upsert(
         { code: p.code, barcode: p.barcode || null, description: p.description },
         { onConflict: 'code' }
       )
@@ -173,14 +179,17 @@ export default function AdminPage() {
     const confirmed = confirm('¿Finalizar la sesión? Ya no se podrán agregar más conteos.')
     if (!confirmed) return
 
-    await supabase
-      .from('sessions')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', selectedSession.id)
+    try {
+      await getSupabase().from('sessions')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', selectedSession.id)
 
-    loadSessions()
-    setSelectedSession(null)
-    setCounts([])
+      loadSessions()
+      setSelectedSession(null)
+      setCounts([])
+    } catch (e) {
+      console.error('Error finalizando sesión:', e)
+    }
   }
 
   return (

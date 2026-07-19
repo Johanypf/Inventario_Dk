@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { Product } from '@/lib/types'
 import Scanner from '@/components/Scanner'
 import ProductCard from '@/components/ProductCard'
@@ -36,7 +36,7 @@ export default function InventoryPage({
     }
     setEmployeeName(name)
 
-    supabase
+getSupabase()
       .from('sessions')
       .select('name, pin')
       .eq('id', sessionId)
@@ -49,7 +49,7 @@ export default function InventoryPage({
   }, [sessionId, router])
 
   useEffect(() => {
-    const channel = supabase
+    const channel = getSupabase()
       .channel('counts-changes')
       .on(
         'postgres_changes',
@@ -63,12 +63,11 @@ export default function InventoryPage({
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { getSupabase().removeChannel(channel) }
   }, [sessionId])
 
   async function loadRecentScans() {
-    const { data } = await supabase
-      .from('counts')
+    const { data } = await getSupabase().from('counts')
       .select('quantity, scanned_by, created_at, products:product_id(code, description)')
       .eq('session_id', sessionId)
       .order('updated_at', { ascending: false })
@@ -108,8 +107,7 @@ export default function InventoryPage({
     setSearching(true)
     setProduct(null)
 
-    const { data } = await supabase
-      .from('products')
+    const { data } = await getSupabase().from('products')
       .select('*')
       .or(`code.eq.${code},barcode.eq.${code}`)
       .maybeSingle()
@@ -128,8 +126,7 @@ export default function InventoryPage({
     setSaving(true)
     setError('')
 
-    const { error: err } = await supabase
-      .from('counts')
+    const { error: err } = await getSupabase().from('counts')
       .upsert(
         {
           session_id: sessionId,

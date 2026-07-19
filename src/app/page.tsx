@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import type { Session } from '@/lib/types'
 
 export default function HomePage() {
@@ -28,7 +28,7 @@ export default function HomePage() {
   }, [employeeName])
 
   async function loadSessions() {
-    const { data } = await supabase
+    const { data } = await getSupabase()
       .from('sessions')
       .select('*')
       .eq('status', 'active')
@@ -42,7 +42,7 @@ export default function HomePage() {
     setLoading(true)
     setError('')
 
-    const { data, error: err } = await supabase
+    const { data, error: err } = await getSupabase()
       .from('sessions')
       .insert({ name: sessionName, pin: sessionPin })
       .select()
@@ -68,7 +68,7 @@ export default function HomePage() {
     setLoading(true)
     setError('')
 
-    const { data, error: err } = await supabase
+    const { data, error: err } = await getSupabase()
       .from('sessions')
       .select('*')
       .eq('pin', joinPin)
