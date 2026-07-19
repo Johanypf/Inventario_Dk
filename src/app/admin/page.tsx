@@ -20,7 +20,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     const stored = sessionStorage.getItem('dk_admin_auth')
-    if (stored === 'true') setAuthenticated(true)
+    if (stored === 'true') {
+      setAuthenticated(true)
+      loadSessions()
+    }
   }, [])
 
   function handleLogin() {
@@ -68,10 +71,6 @@ export default function AdminPage() {
       </main>
     )
   }
-
-  useEffect(() => {
-    loadSessions()
-  }, [])
 
   async function loadSessions() {
     try {
