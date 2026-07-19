@@ -5,6 +5,9 @@ import { supabase } from '@/lib/supabase'
 import type { Session, CountWithProduct } from '@/lib/types'
 
 export default function AdminPage() {
+  const [authenticated, setAuthenticated] = useState(false)
+  const [adminPin, setAdminPin] = useState('')
+  const [pinError, setPinError] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
   const [counts, setCounts] = useState<CountWithProduct[]>([])
@@ -12,6 +15,59 @@ export default function AdminPage() {
   const [uploadResult, setUploadResult] = useState<{ ok: number; errors: string[] } | null>(null)
   const [exporting, setExporting] = useState(false)
   const [tab, setTab] = useState<'catalog' | 'export'>('catalog')
+
+  const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || 'admin123'
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('dk_admin_auth')
+    if (stored === 'true') setAuthenticated(true)
+  }, [])
+
+  function handleLogin() {
+    if (adminPin === ADMIN_PIN) {
+      setAuthenticated(true)
+      setPinError(false)
+      sessionStorage.setItem('dk_admin_auth', 'true')
+      loadSessions()
+    } else {
+      setPinError(true)
+    }
+  }
+
+  if (!authenticated) {
+    return (
+      <main className="flex-1 p-4 max-w-lg mx-auto w-full flex items-center justify-center min-h-screen">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold text-gray-900">Administración</h1>
+            <p className="text-sm text-gray-500 mt-1">Ingresa el PIN de administrador</p>
+          </div>
+          <input
+            type="password"
+            value={adminPin}
+            onChange={(e) => { setAdminPin(e.target.value); setPinError(false) }}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            placeholder="PIN"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-center text-xl tracking-widest mb-3"
+            autoFocus
+          />
+          {pinError && <p className="text-red-500 text-sm text-center mb-3">PIN incorrecto</p>}
+          <button
+            onClick={handleLogin}
+            className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold active:scale-[0.98]"
+          >
+            Ingresar
+          </button>
+          <a href="/" className="block text-center text-sm text-gray-400 mt-4 underline">Volver al inicio</a>
+        </div>
+      </main>
+    )
+  }
 
   useEffect(() => {
     loadSessions()
