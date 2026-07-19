@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import type { Session, CountWithProduct } from '@/lib/types'
 
@@ -15,6 +16,7 @@ export default function AdminPage() {
   const [creatingSession, setCreatingSession] = useState(false)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
   const [counts, setCounts] = useState<CountWithProduct[]>([])
+  const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<{ ok: number; errors: string[] } | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -222,7 +224,15 @@ export default function AdminPage() {
           </svg>
         </a>
         <h1 className="text-xl font-bold text-gray-900">Administración</h1>
-        <div className="w-10" />
+        <button
+          onClick={() => {
+            sessionStorage.removeItem('dk_admin_auth')
+            router.push('/')
+          }}
+          className="text-red-500 text-sm font-medium"
+        >
+          Salir
+        </button>
       </div>
 
       {/* Tabs */}
