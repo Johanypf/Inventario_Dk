@@ -1,0 +1,315 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import type { Session, CountWithProduct } from '@/lib/types'
+
+export default function AdminPage() {
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null)
+  const [counts, setCounts] = useState<CountWithProduct[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadResult, setUploadResult] = useState<{ ok: number; errors: string[] } | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [tab, setTab] = useState<'catalog' | 'export'>('catalog')
+
+  useEffect(() => {
+    loadSessions()
+  }, [])
+
+  async function loadSessions() {
+    const { data } = await supabase
+      .from('sessions')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (data) setSessions(data)
+  }
+
+  async function loadCounts(sessionId: string) {
+    const { data } = await supabase
+      .from('counts')
+      .select('*, products(*)')
+      .eq('session_id', sessionId)
+      .order('updated_at', { ascending: false })
+
+    if (data) setCounts(data as unknown as CountWithProduct[])
+  }
+
+  function parseCSV(text: string): { code: string; barcode: string; description: string }[] {
+    const lines = text.split('\n').filter((l) => l.trim())
+    const parsed: { code: string; barcode: string; description: string }[] = []
+
+    for (const line of lines) {
+      const parts = line.includes('\t') ? line.split('\t') : line.split(',')
+      if (parts.length < 2) continue
+
+      const code = parts[0].trim().replace(/^"|"$/g, '')
+      const description = parts[parts.length - 1].trim().replace(/^"|"$/g, '')
+
+      let barcode = ''
+      if (parts.length >= 3) {
+        barcode = parts[1].trim().replace(/^"|"$/g, '')
+      }
+
+      if (code && description) {
+        parsed.push({ code, barcode, description })
+      }
+    }
+    return parsed
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setUploadResult(null)
+
+    const text = await file.text()
+    const products = parseCSV(text)
+    const errors: string[] = []
+    let ok = 0
+
+    for (const p of products) {
+      const { error } = await supabase.from('products').upsert(
+        { code: p.code, barcode: p.barcode || null, description: p.description },
+        { onConflict: 'code' }
+      )
+      if (error) {
+        errors.push(`${p.code}: ${error.message}`)
+      } else {
+        ok++
+      }
+    }
+
+    setUploadResult({ ok, errors })
+    setUploading(false)
+  }
+
+  function handleSelectSession(session: Session) {
+    setSelectedSession(session)
+    loadCounts(session.id)
+  }
+
+  function generateTXT(): string {
+    const lines = counts.map((c) => {
+      const identifier = c.products?.barcode || c.products?.code || ''
+      return `${identifier}\t${c.quantity}`
+    })
+    return lines.join('\n')
+  }
+
+  function handleExport() {
+    setExporting(true)
+    const txt = generateTXT()
+    const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inventario_${selectedSession?.name?.replace(/\s+/g, '_') || 'export'}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExporting(false)
+  }
+
+  async function handleEndSession() {
+    if (!selectedSession) return
+    const confirmed = confirm('¿Finalizar la sesión? Ya no se podrán agregar más conteos.')
+    if (!confirmed) return
+
+    await supabase
+      .from('sessions')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', selectedSession.id)
+
+    loadSessions()
+    setSelectedSession(null)
+    setCounts([])
+  }
+
+  return (
+    <main className="flex-1 p-4 max-w-lg mx-auto w-full pt-6 pb-20">
+      <div className="flex items-center justify-between mb-6">
+        <a href="/" className="text-gray-500 p-2">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </a>
+        <h1 className="text-xl font-bold text-gray-900">Administración</h1>
+        <div className="w-10" />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex bg-white rounded-xl p-1 shadow-sm mb-6 border border-gray-200">
+        <button
+          onClick={() => setTab('catalog')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+            tab === 'catalog' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'
+          }`}
+        >
+          Catálogo
+        </button>
+        <button
+          onClick={() => setTab('export')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+            tab === 'export' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'
+          }`}
+        >
+          Exportar
+        </button>
+      </div>
+
+      {tab === 'catalog' && (
+        <div className="bg-white rounded-xl shadow-md p-5">
+          <h2 className="text-lg font-bold mb-2">Subir Catálogo de Productos</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Sube el archivo exportado de tu POS (CSV o TXT con columnas: código, código de barras, descripción).
+          </p>
+
+          <label className="block">
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors">
+              <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p className="text-sm text-gray-600">
+                {uploading ? 'Subiendo...' : 'Toca para seleccionar archivo'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">CSV o TXT</p>
+            </div>
+            <input
+              type="file"
+              accept=".csv,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={uploading}
+            />
+          </label>
+
+          {uploadResult && (
+            <div className="mt-4 p-3 rounded-xl bg-gray-50">
+              <p className="text-sm font-medium text-green-700">
+                ✓ {uploadResult.ok} productos importados
+              </p>
+              {uploadResult.errors.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs font-medium text-red-600">
+                    {uploadResult.errors.length} errores:
+                  </p>
+                  <ul className="text-xs text-red-500 mt-1 max-h-32 overflow-y-auto">
+                    {uploadResult.errors.slice(0, 10).map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4">
+            <a
+              href="/plantilla_ejemplo.txt"
+              download
+              className="text-sm text-blue-600 underline"
+            >
+              Descargar plantilla de ejemplo
+            </a>
+          </div>
+        </div>
+      )}
+
+      {tab === 'export' && (
+        <div>
+          {/* Sessions list */}
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Sesiones
+            </h2>
+            <div className="space-y-2">
+              {sessions.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => handleSelectSession(s)}
+                  className={`w-full text-left bg-white rounded-xl p-4 shadow-sm border transition-all ${
+                    selectedSession?.id === s.id
+                      ? 'border-blue-500 ring-2 ring-blue-100'
+                      : 'border-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{s.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(s.created_at).toLocaleDateString()} {s.status === 'completed' ? '✓ Finalizada' : '● Activa'}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        s.status === 'active'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {s.status === 'active' ? 'Activa' : 'Completada'}
+                    </span>
+                  </div>
+                </button>
+              ))}
+              {sessions.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">
+                  No hay sesiones creadas
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Export section */}
+          {selectedSession && (
+            <div className="bg-white rounded-xl shadow-md p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900">{selectedSession.name}</h3>
+                <span className="text-sm text-gray-500">
+                  {counts.length} productos contados
+                </span>
+              </div>
+
+              {counts.length > 0 && (
+                <div className="max-h-48 overflow-y-auto mb-4 border border-gray-100 rounded-xl divide-y divide-gray-100">
+                  {counts.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between p-3 text-sm">
+                      <span className="text-gray-700 truncate flex-1">
+                        {c.products?.description || 'Desconocido'}
+                      </span>
+                      <span className="font-bold text-blue-600 ml-2">x{c.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExport}
+                  disabled={exporting || counts.length === 0}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {exporting ? 'Generando...' : 'Exportar TXT'}
+                </button>
+                {selectedSession.status === 'active' && (
+                  <button
+                    onClick={handleEndSession}
+                    className="py-3 px-4 bg-red-50 text-red-600 rounded-xl font-medium active:scale-[0.98]"
+                  >
+                    Finalizar
+                  </button>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-400 mt-3 text-center">
+                El TXT se genera con formato: código de barras + TAB + cantidad
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </main>
+  )
+}
