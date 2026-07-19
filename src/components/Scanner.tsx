@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 
 interface ScannerProps {
@@ -11,59 +11,94 @@ interface ScannerProps {
 
 export default function Scanner({ onScan, onError, running }: ScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [cameraError, setCameraError] = useState(false)
+  const [starting, setStarting] = useState(false)
 
-  useEffect(() => {
-    if (!running) {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {})
-      }
-      return
+  const startCamera = useCallback(async () => {
+    if (scannerRef.current) return
+    setStarting(true)
+    setCameraError(false)
+
+    try {
+      const scanner = new Html5Qrcode('scanner-container')
+      scannerRef.current = scanner
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 150 },
+        },
+        (decodedText) => {
+          onScan(decodedText.trim())
+        },
+        () => {}
+      )
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error de cámara'
+      setCameraError(true)
+      onError?.(msg)
     }
+    setStarting(false)
+  }, [onScan, onError])
 
-    const startScanner = async () => {
+  const stopCamera = useCallback(async () => {
+    if (scannerRef.current) {
       try {
-        const scanner = new Html5Qrcode('scanner-container')
-        scannerRef.current = scanner
-
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
-          },
-          (decodedText) => {
-            onScan(decodedText.trim())
-          },
-          () => {}
-        )
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Error de cámara'
-        setCameraError(true)
-        onError?.(msg)
-      }
+        await scannerRef.current.stop()
+      } catch { /* ignore */ }
+      scannerRef.current = null
     }
+  }, [])
 
-    startScanner()
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {})
-      }
-    }
-  }, [running, onScan, onError])
+  if (!running) {
+    return null
+  }
 
   return (
     <div className="relative">
       <div
         id="scanner-container"
+        ref={containerRef}
         className="w-full max-w-md mx-auto overflow-hidden rounded-xl bg-black"
         style={{ minHeight: '250px' }}
       />
+
+      {!scannerRef.current && !starting && !cameraError && (
+        <button
+          onClick={startCamera}
+          className="mt-3 w-full py-3 bg-blue-600 text-white rounded-xl font-medium active:scale-[0.98]"
+        >
+          Iniciar Cámara
+        </button>
+      )}
+
+      {starting && (
+        <p className="text-sm text-gray-500 text-center mt-2">Iniciando cámara...</p>
+      )}
+
+      {scannerRef.current && (
+        <button
+          onClick={stopCamera}
+          className="mt-2 w-full py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:scale-[0.98]"
+        >
+          Detener cámara
+        </button>
+      )}
+
       {cameraError && (
-        <p className="text-sm text-red-500 text-center mt-2">
-          No se pudo acceder a la cámara. Usa la entrada manual.
-        </p>
+        <div className="mt-3 text-center">
+          <p className="text-sm text-red-500 mb-2">
+            No se pudo acceder a la cámara. Usa la entrada manual.
+          </p>
+          <button
+            onClick={startCamera}
+            className="text-sm text-blue-600 underline"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
       )}
     </div>
   )

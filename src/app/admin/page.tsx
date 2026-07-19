@@ -9,6 +9,10 @@ export default function AdminPage() {
   const [adminPin, setAdminPin] = useState('')
   const [pinError, setPinError] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
+  const [showCreateSession, setShowCreateSession] = useState(false)
+  const [newSessionName, setNewSessionName] = useState('')
+  const [newSessionPin, setNewSessionPin] = useState('1234')
+  const [creatingSession, setCreatingSession] = useState(false)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
   const [counts, setCounts] = useState<CountWithProduct[]>([])
   const [uploading, setUploading] = useState(false)
@@ -70,6 +74,24 @@ export default function AdminPage() {
         </div>
       </main>
     )
+  }
+
+  async function handleCreateSession() {
+    if (!newSessionName.trim()) return
+    setCreatingSession(true)
+    try {
+      const { error } = await getSupabase().from('sessions')
+        .insert({ name: newSessionName, pin: newSessionPin })
+      if (!error) {
+        setNewSessionName('')
+        setNewSessionPin('1234')
+        setShowCreateSession(false)
+        loadSessions()
+      }
+    } catch (e) {
+      console.error('Error creando sesión:', e)
+    }
+    setCreatingSession(false)
   }
 
   async function loadSessions() {
@@ -283,10 +305,56 @@ export default function AdminPage() {
 
       {tab === 'export' && (
         <div>
+          {/* Create Session */}
+          <div className="mb-4">
+            {!showCreateSession ? (
+              <button
+                onClick={() => setShowCreateSession(true)}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-sm active:scale-[0.98]"
+              >
+                + Nueva Sesión
+              </button>
+            ) : (
+              <div className="bg-white rounded-xl shadow-md p-4 border border-blue-200">
+                <h3 className="font-bold text-gray-900 mb-3">Crear Sesión</h3>
+                <input
+                  type="text"
+                  value={newSessionName}
+                  onChange={(e) => setNewSessionName(e.target.value)}
+                  placeholder="Nombre de la sesión"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none mb-2"
+                />
+                <input
+                  type="text"
+                  value={newSessionPin}
+                  onChange={(e) => setNewSessionPin(e.target.value)}
+                  placeholder="PIN"
+                  maxLength={6}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-center text-xl tracking-widest mb-3"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowCreateSession(false)}
+                    className="flex-1 py-3 bg-gray-100 rounded-xl font-medium active:scale-[0.98]"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCreateSession}
+                    disabled={creatingSession || !newSessionName.trim()}
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50 active:scale-[0.98]"
+                  >
+                    {creatingSession ? 'Creando...' : 'Crear'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Sessions list */}
           <div className="mb-4">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Sesiones
+              Sesiones activas
             </h2>
             <div className="space-y-2">
               {sessions.map((s) => (
