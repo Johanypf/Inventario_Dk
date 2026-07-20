@@ -326,6 +326,20 @@ export default function InventoryPage({
             saving={saving}
             saved={saved}
           />
+          <button
+            onClick={() => {
+              setProduct(null)
+              productIdRef.current = null
+              setExistingCount(null)
+              setSearchInput('')
+              setQuantity(1)
+              setSaved(false)
+              setScannerRunning(true)
+            }}
+            className="w-full mt-2 py-3 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 active:scale-[0.98] transition-all"
+          >
+            Escanear otro código
+          </button>
         </div>
       )}
 
