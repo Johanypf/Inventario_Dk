@@ -368,33 +368,47 @@ export default function AdminPage() {
             </h2>
             <div className="space-y-2">
               {sessions.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => handleSelectSession(s)}
-                  className={`w-full text-left bg-white rounded-xl p-4 shadow-sm border transition-all ${
-                    selectedSession?.id === s.id
-                      ? 'border-blue-500 ring-2 ring-blue-100'
-                      : 'border-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{s.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(s.created_at).toLocaleDateString()} {s.status === 'completed' ? '✓ Finalizada' : '● Activa'}
-                      </p>
+                <div key={s.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <button
+                    onClick={() => handleSelectSession(s)}
+                    className="w-full text-left p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{s.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(s.created_at).toLocaleDateString()} {s.status === 'completed' ? '✓ Finalizada' : '● Activa'}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          s.status === 'active'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {s.status === 'active' ? 'Activa' : 'Completada'}
+                      </span>
                     </div>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        s.status === 'active'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {s.status === 'active' ? 'Activa' : 'Completada'}
-                    </span>
-                  </div>
-                </button>
+                  </button>
+                  {s.status === 'active' && (
+                    <div className="px-4 pb-3">
+                      <button
+                        onClick={async () => {
+                          if (confirm(`¿Finalizar la sesión "${s.name}"?`)) {
+                            await getSupabase().from('sessions')
+                              .update({ status: 'completed', completed_at: new Date().toISOString() })
+                              .eq('id', s.id)
+                            loadSessions()
+                          }
+                        }}
+                        className="w-full py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:scale-[0.98]"
+                      >
+                        Finalizar
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
               {sessions.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-4">
