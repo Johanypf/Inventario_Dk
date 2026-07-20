@@ -294,7 +294,7 @@ export default function AdminPage() {
               <p className="text-sm text-gray-600">
                 {uploading ? 'Subiendo...' : 'Toca para seleccionar archivo'}
               </p>
-              <p className="text-xs text-gray-400 mt-1">CSV o TXT</p>
+              <p className="text-xs text-gray-400 mt-1">CSV, TXT, Excel</p>
             </div>
             <input
               type="file"
