@@ -76,9 +76,12 @@ getSupabase()
     if (data) {
       setRecentScans(
         data.map((r: Record<string, unknown>) => {
-          const products = r.products as Record<string, unknown>[] | undefined
+          const p = r.products as Record<string, unknown>[] | undefined
+          const prod = p?.[0]
+          const desc = (prod?.description as string) || ''
+          const code = (prod?.code as string) || ''
           return {
-            description: (products?.[0]?.description as string) || 'Desconocido',
+            description: desc || code || 'Sin datos',
             qty: r.quantity as number,
             time: r.created_at as string,
           }

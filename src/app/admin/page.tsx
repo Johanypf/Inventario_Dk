@@ -122,18 +122,28 @@ export default function AdminPage() {
     }
   }
 
-  function parseRows(rows: unknown[][]): { code: string; barcode: string; description: string }[] {
-    const parsed: { code: string; barcode: string; description: string }[] = []
-    for (const row of rows) {
-      if (row.length < 2) continue
-      const code = String(row[0] ?? '').trim().replace(/^"|"$/g, '')
-      const description = String(row[row.length - 1] ?? '').trim().replace(/^"|"$/g, '')
-      const barcode = row.length >= 3 ? String(row[1] ?? '').trim().replace(/^"|"$/g, '') : ''
-      if (code && description) {
-        parsed.push({ code, barcode, description })
-      }
+  function parseRow(raw: unknown[]): { code: string; barcode: string; description: string } | null {
+    let cells = raw.map((c) => String(c ?? '').trim().replace(/^"|"$/g, '')).filter(Boolean)
+
+    if (cells.length === 0) return null
+
+    const first = cells[0]
+    if (first.includes('\t') || first.includes(';') || first.includes(',')) {
+      const split = first.split(/[;\t,]+/).map((s) => s.trim()).filter(Boolean)
+      if (split.length >= 2) cells = split
     }
-    return parsed
+
+    if (cells.length < 2) return null
+
+    return {
+      code: cells[0],
+      barcode: cells.length >= 3 ? cells[1] : '',
+      description: cells[cells.length - 1],
+    }
+  }
+
+  function parseRows(rows: unknown[][]): { code: string; barcode: string; description: string }[] {
+    return rows.map(parseRow).filter((r): r is NonNullable<typeof r> => r !== null)
   }
 
   function parseCSV(text: string): { code: string; barcode: string; description: string }[] {
