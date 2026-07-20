@@ -13,7 +13,7 @@ export default function AdminPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [showCreateSession, setShowCreateSession] = useState(false)
   const [newSessionName, setNewSessionName] = useState('')
-  const [newSessionPin, setNewSessionPin] = useState('1234')
+  const [newSessionPin, setNewSessionPin] = useState('')
   const [creatingSession, setCreatingSession] = useState(false)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
   const [counts, setCounts] = useState<CountWithProduct[]>([])
@@ -213,7 +213,7 @@ export default function AdminPage() {
   function generateTXT(): string {
     const lines = counts.map((c) => {
       const identifier = c.products?.barcode || c.products?.code || ''
-      return `${identifier}\t${c.quantity}`
+      return `${identifier},${c.quantity}`
     })
     return lines.join('\n')
   }
