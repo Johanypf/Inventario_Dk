@@ -121,21 +121,17 @@ export default function InventoryPage({
 
       if (pid in countsCache.current) {
         setExistingCount(countsCache.current[pid])
+      } else {
+        const { data: existing } = await getSupabase().from('counts')
+          .select('quantity')
+          .eq('session_id', sessionId)
+          .eq('product_id', pid)
+          .maybeSingle()
+        if (existing) {
+          countsCache.current[pid] = existing.quantity
+          setExistingCount(existing.quantity)
+        }
       }
-
-      getSupabase().from('counts')
-        .select('quantity')
-        .eq('session_id', sessionId)
-        .eq('product_id', pid)
-        .maybeSingle()
-        .then(({ data: existing }) => {
-          if (existing) {
-            countsCache.current[pid] = existing.quantity
-            if (productIdRef.current === pid) {
-              setExistingCount(existing.quantity)
-            }
-          }
-        })
     } else {
       playError()
       setError(`Producto no encontrado: "${code}"`)
