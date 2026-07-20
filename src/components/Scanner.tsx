@@ -28,7 +28,7 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: { width: 250, height: 150 },
+          qrbox: { width: 200, height: 100 },
         },
         (decodedText) => {
           onScan(decodedText.trim())
@@ -62,7 +62,7 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
         id="scanner-container"
         ref={containerRef}
         className="w-full max-w-md mx-auto overflow-hidden rounded-xl bg-black"
-        style={{ minHeight: '250px' }}
+        style={{ minHeight: '200px', maxHeight: '250px' }}
       />
 
       {!scannerRef.current && !starting && !cameraError && (

@@ -43,27 +43,16 @@ export default function ProductCard({
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Cantidad contada
         </label>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => onQuantityChange(Math.max(0, quantity - 1))}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-600 active:bg-gray-200"
-          >
-            -
-          </button>
-          <input
-            type="number"
-            min="0"
-            value={quantity}
-            onChange={(e) => onQuantityChange(Math.max(0, parseInt(e.target.value) || 0))}
-            className="flex-1 text-center text-2xl font-bold py-2 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-          />
-          <button
-            onClick={() => onQuantityChange(quantity + 1)}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-600 active:bg-gray-200"
-          >
-            +
-          </button>
-        </div>
+        <input
+          type="number"
+          min="0"
+          inputMode="numeric"
+          value={quantity}
+          onChange={(e) => onQuantityChange(Math.max(0, parseInt(e.target.value) || 0))}
+          onFocus={(e) => e.target.select()}
+          placeholder="0"
+          className="w-full text-center text-2xl font-bold py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+        />
       </div>
       <button
         onClick={onSave}

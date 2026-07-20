@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import * as XLSX from 'xlsx'
 import { getSupabase } from '@/lib/supabase'
 import type { Session, CountWithProduct } from '@/lib/types'
 
@@ -121,27 +122,38 @@ export default function AdminPage() {
     }
   }
 
-  function parseCSV(text: string): { code: string; barcode: string; description: string }[] {
-    const lines = text.split('\n').filter((l) => l.trim())
+  function parseRows(rows: unknown[][]): { code: string; barcode: string; description: string }[] {
     const parsed: { code: string; barcode: string; description: string }[] = []
-
-    for (const line of lines) {
-      const parts = line.includes('\t') ? line.split('\t') : line.split(',')
-      if (parts.length < 2) continue
-
-      const code = parts[0].trim().replace(/^"|"$/g, '')
-      const description = parts[parts.length - 1].trim().replace(/^"|"$/g, '')
-
-      let barcode = ''
-      if (parts.length >= 3) {
-        barcode = parts[1].trim().replace(/^"|"$/g, '')
-      }
-
+    for (const row of rows) {
+      if (row.length < 2) continue
+      const code = String(row[0] ?? '').trim().replace(/^"|"$/g, '')
+      const description = String(row[row.length - 1] ?? '').trim().replace(/^"|"$/g, '')
+      const barcode = row.length >= 3 ? String(row[1] ?? '').trim().replace(/^"|"$/g, '') : ''
       if (code && description) {
         parsed.push({ code, barcode, description })
       }
     }
     return parsed
+  }
+
+  function parseCSV(text: string): { code: string; barcode: string; description: string }[] {
+    const lines = text.split('\n').filter((l) => l.trim())
+    return parseRows(lines.map((l) => {
+      const parts = l.includes('\t') ? l.split('\t') : l.split(',')
+      return parts.map((p) => p.trim().replace(/^"|"$/g, ''))
+    }))
+  }
+
+  function parseExcel(data: ArrayBuffer): { code: string; barcode: string; description: string }[] {
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][]
+    const headerIndex = rows.findIndex((r) => {
+      const vals = r.map(String)
+      return vals.some((v) => /c(o|ó)digo/i.test(v)) || vals.some((v) => /descripci(o|ó)n/i.test(v))
+    })
+    const dataRows = headerIndex >= 0 ? rows.slice(headerIndex + 1) : rows
+    return parseRows(dataRows)
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -151,8 +163,15 @@ export default function AdminPage() {
     setUploading(true)
     setUploadResult(null)
 
-    const text = await file.text()
-    const products = parseCSV(text)
+    let products: { code: string; barcode: string; description: string }[]
+
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const buffer = await file.arrayBuffer()
+      products = parseExcel(buffer)
+    } else {
+      const text = await file.text()
+      products = parseCSV(text)
+    }
     const errors: string[] = []
     let ok = 0
 
@@ -275,7 +294,7 @@ export default function AdminPage() {
             </div>
             <input
               type="file"
-              accept=".csv,.txt"
+              accept=".csv,.txt,.xlsx,.xls"
               onChange={handleFileUpload}
               className="hidden"
               disabled={uploading}
