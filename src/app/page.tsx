@@ -70,7 +70,7 @@ export default function HomePage() {
             type="text"
             value={employeeName}
             onChange={(e) => setEmployeeName(e.target.value)}
-            placeholder="Ej: Juan"
+            placeholder="Nombre"
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-lg"
           />
         </div>
@@ -84,7 +84,7 @@ export default function HomePage() {
             value={joinPin}
             onChange={(e) => { setJoinPin(e.target.value); setError('') }}
             onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
-            placeholder="Ej: 1234"
+            placeholder="PIN"
             maxLength={6}
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-center text-2xl tracking-widest mb-4"
             autoFocus
