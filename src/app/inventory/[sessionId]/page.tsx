@@ -336,26 +336,7 @@ export default function InventoryPage({
             saved={saved}
           />
           <button
-            onClick={async () => {
-              if (quantity > 0 && product && !saving) {
-                setSaving(true)
-                if (saveMode === 'add' && existingCount !== null) {
-                  await getSupabase().rpc('increment_count', {
-                    p_session_id: sessionId,
-                    p_product_id: product.id,
-                    p_quantity: quantity,
-                    p_scanned_by: employeeName,
-                  })
-                } else {
-                  await getSupabase().rpc('set_count', {
-                    p_session_id: sessionId,
-                    p_product_id: product.id,
-                    p_quantity: quantity,
-                    p_scanned_by: employeeName,
-                  })
-                }
-                setSaving(false)
-              }
+            onClick={() => {
               setProduct(null)
               productIdRef.current = null
               setExistingCount(null)
@@ -364,9 +345,9 @@ export default function InventoryPage({
               setSaved(false)
               setScannerRunning(true)
             }}
-            className="w-full mt-2 py-2 rounded-xl text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 active:scale-[0.98] transition-all"
+            className="w-full py-2.5 rounded-xl font-semibold text-base transition-all active:scale-[0.98] bg-blue-600 text-white hover:bg-blue-700"
           >
-            Guardar y escanear otro
+            Escanear
           </button>
         </div>
       )}
