@@ -29,7 +29,7 @@ export default function InventoryPage({
   const [searching, setSearching] = useState(false)
   const [existingCount, setExistingCount] = useState<number | null>(null)
   const [saveMode, setSaveMode] = useState<'set' | 'add'>('add')
-  const productIdRef = useRef<string | null>(null)
+  const productIdRef = useRef<number | null>(null)
   const countsCache = useRef<Record<number, number>>({})
 
   useEffect(() => {
@@ -115,7 +115,7 @@ export default function InventoryPage({
     if (data) {
       playSuccess()
       const pid = data.id
-      productIdRef.current = pid as unknown as string
+      productIdRef.current = pid
       setProduct(data as Product)
       setScannerRunning(false)
 
@@ -131,7 +131,7 @@ export default function InventoryPage({
         .then(({ data: existing }) => {
           if (existing) {
             countsCache.current[pid] = existing.quantity
-            if (productIdRef.current === (pid as unknown as string)) {
+            if (productIdRef.current === pid) {
               setExistingCount(existing.quantity)
             }
           }
