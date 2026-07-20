@@ -25,12 +25,11 @@ export default function InventoryPage({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
-  const [recentScans, setRecentScans] = useState<{ description: string; qty: number; time: string }[]>([])
   const [sessionInfo, setSessionInfo] = useState<{ name: string; pin: string } | null>(null)
   const [searching, setSearching] = useState(false)
   const [existingCount, setExistingCount] = useState<number | null>(null)
   const [saveMode, setSaveMode] = useState<'set' | 'add'>('add')
-  const countsCache = useRef<Record<string, number>>({})
+  const productIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     const name = localStorage.getItem('dk_employee_name')
@@ -41,7 +40,7 @@ export default function InventoryPage({
     }
     setEmployeeName(name)
 
-getSupabase()
+    getSupabase()
       .from('sessions')
       .select('name, pin')
       .eq('id', sessionId)
@@ -49,8 +48,6 @@ getSupabase()
       .then(({ data }) => {
         if (data) setSessionInfo(data)
       })
-
-    loadRecentScans()
   }, [sessionId, router])
 
   useEffect(() => {
@@ -59,41 +56,27 @@ getSupabase()
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
-        () => loadRecentScans()
+        (payload) => {
+          const pid = payload.new.product_id as string
+          if (pid === productIdRef.current) {
+            setExistingCount(payload.new.quantity as number)
+          }
+        }
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
-        () => loadRecentScans()
+        (payload) => {
+          const pid = payload.new.product_id as string
+          if (pid === productIdRef.current) {
+            setExistingCount(payload.new.quantity as number)
+          }
+        }
       )
       .subscribe()
 
     return () => { getSupabase().removeChannel(channel) }
   }, [sessionId])
-
-  async function loadRecentScans() {
-    const { data } = await getSupabase().from('counts')
-      .select('quantity, scanned_by, created_at, products:product_id(code, description)')
-      .eq('session_id', sessionId)
-      .order('updated_at', { ascending: false })
-      .limit(20)
-
-    if (data) {
-      setRecentScans(
-        data.map((r: Record<string, unknown>) => {
-          const p = r.products as Record<string, unknown>[] | undefined
-          const prod = p?.[0]
-          const desc = (prod?.description as string) || ''
-          const code = (prod?.code as string) || ''
-          return {
-            description: desc || code || 'Sin datos',
-            qty: r.quantity as number,
-            time: r.created_at as string,
-          }
-        })
-      )
-    }
-  }
 
   const handleScan = useCallback(async (code: string) => {
     if (scanningRef.current) return
@@ -129,22 +112,16 @@ getSupabase()
     if (data) {
       playSuccess()
       setProduct(data as Product)
+      productIdRef.current = data.id as string
       setScannerRunning(false)
-      const pid = data.id as string
-      if (pid in countsCache.current) {
-        setExistingCount(countsCache.current[pid])
+      const { data: existing } = await getSupabase().from('counts')
+        .select('quantity')
+        .eq('session_id', sessionId)
+        .eq('product_id', data.id as string)
+        .maybeSingle()
+      if (existing) {
+        setExistingCount(existing.quantity)
         setQuantity(1)
-      } else {
-        const { data: existing } = await getSupabase().from('counts')
-          .select('quantity')
-          .eq('session_id', sessionId)
-          .eq('product_id', pid)
-          .maybeSingle()
-        if (existing) {
-          setExistingCount(existing.quantity)
-          countsCache.current[pid] = existing.quantity
-          setQuantity(1)
-        }
       }
     } else {
       playError()
@@ -172,13 +149,9 @@ getSupabase()
         playSuccess()
         setSaved(true)
         setExistingCount(newQty)
-        countsCache.current[product.id] = newQty
-        setRecentScans(prev => [
-          { description: product.description, qty: newQty, time: new Date().toLocaleTimeString() },
-          ...prev.slice(0, 9),
-        ])
         setTimeout(() => {
           setProduct(null)
+          productIdRef.current = null
           setSearchInput('')
           setQuantity(1)
           setSaved(false)
@@ -204,13 +177,9 @@ getSupabase()
         playSuccess()
         setSaved(true)
         setExistingCount(quantity)
-        countsCache.current[product.id] = quantity
-        setRecentScans(prev => [
-          { description: product.description, qty: quantity, time: new Date().toLocaleTimeString() },
-          ...prev.slice(0, 9),
-        ])
         setTimeout(() => {
           setProduct(null)
+          productIdRef.current = null
           setSearchInput('')
           setQuantity(1)
           setSaved(false)
@@ -350,26 +319,6 @@ getSupabase()
         </div>
       )}
 
-      {/* Recent scans */}
-      {recentScans.length > 0 && (
-        <div className="mt-6">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Últimos conteos
-          </h2>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
-            {recentScans.slice(0, 10).map((s, i) => (
-              <div key={i} className="flex items-center justify-between p-3">
-                <p className="text-sm text-gray-700 truncate flex-1">
-                  {s.description}
-                </p>
-                <span className="text-sm font-bold text-blue-600 ml-2">
-                  x{s.qty}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </main>
   )
 }
