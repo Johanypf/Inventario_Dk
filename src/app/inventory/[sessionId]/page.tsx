@@ -28,7 +28,8 @@ export default function InventoryPage({
   const [sessionInfo, setSessionInfo] = useState<{ name: string; pin: string } | null>(null)
   const [searching, setSearching] = useState(false)
   const [existingCount, setExistingCount] = useState<number | null>(null)
-  const [saveMode, setSaveMode] = useState<'set' | 'add'>('set')
+  const [saveMode, setSaveMode] = useState<'set' | 'add'>('add')
+  const countsCache = useRef<Record<string, number>>({})
 
   useEffect(() => {
     const name = localStorage.getItem('dk_employee_name')
@@ -117,7 +118,7 @@ getSupabase()
     setSearching(true)
     setProduct(null)
     setExistingCount(null)
-    setSaveMode('set')
+    setSaveMode('add')
 
     const { data } = await getSupabase().from('products')
       .select('*')
@@ -127,14 +128,21 @@ getSupabase()
     if (data) {
       setProduct(data as Product)
       setScannerRunning(false)
-      const { data: existing } = await getSupabase().from('counts')
-        .select('quantity')
-        .eq('session_id', sessionId)
-        .eq('product_id', data.id)
-        .maybeSingle()
-      if (existing) {
-        setExistingCount(existing.quantity)
+      const pid = data.id as string
+      if (pid in countsCache.current) {
+        setExistingCount(countsCache.current[pid])
         setQuantity(1)
+      } else {
+        const { data: existing } = await getSupabase().from('counts')
+          .select('quantity')
+          .eq('session_id', sessionId)
+          .eq('product_id', pid)
+          .maybeSingle()
+        if (existing) {
+          setExistingCount(existing.quantity)
+          countsCache.current[pid] = existing.quantity
+          setQuantity(1)
+        }
       }
     } else {
       setError(`Producto no encontrado: "${code}"`)
@@ -159,6 +167,7 @@ getSupabase()
       } else {
         setSaved(true)
         setExistingCount(newQty)
+        countsCache.current[product.id] = newQty
         setRecentScans(prev => [
           { description: product.description, qty: newQty, time: new Date().toLocaleTimeString() },
           ...prev.slice(0, 9),
@@ -188,6 +197,7 @@ getSupabase()
       } else {
         setSaved(true)
         setExistingCount(quantity)
+        countsCache.current[product.id] = quantity
         setRecentScans(prev => [
           { description: product.description, qty: quantity, time: new Date().toLocaleTimeString() },
           ...prev.slice(0, 9),
