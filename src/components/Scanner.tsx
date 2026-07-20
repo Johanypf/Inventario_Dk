@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 
 interface ScannerProps {
@@ -11,9 +11,17 @@ interface ScannerProps {
 
 export default function Scanner({ onScan, onError, running }: ScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
   const [cameraError, setCameraError] = useState(false)
   const [starting, setStarting] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {})
+        scannerRef.current = null
+      }
+    }
+  }, [])
 
   const startCamera = useCallback(async () => {
     if (scannerRef.current) return
@@ -28,11 +36,11 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
-            width: Math.min(200, viewfinderWidth * 0.8),
-            height: 100,
-            x: (viewfinderWidth - Math.min(200, viewfinderWidth * 0.8)) / 2,
-            y: viewfinderHeight * 0.08,
+          qrbox: (viewfinderWidth: number) => ({
+            width: Math.min(220, viewfinderWidth * 0.85),
+            height: 90,
+            x: (viewfinderWidth - Math.min(220, viewfinderWidth * 0.85)) / 2,
+            y: 10,
           }),
         },
         (decodedText) => {
@@ -65,9 +73,8 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
     <div className="relative">
       <div
         id="scanner-container"
-        ref={containerRef}
         className="w-full max-w-md mx-auto overflow-hidden rounded-xl bg-black"
-        style={{ minHeight: '200px', maxHeight: '250px' }}
+        style={{ minHeight: '200px', maxHeight: '220px' }}
       />
 
       {!scannerRef.current && !starting && !cameraError && (

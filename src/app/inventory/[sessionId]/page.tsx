@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import { Product } from '@/lib/types'
@@ -14,6 +14,7 @@ export default function InventoryPage({
 }) {
   const { sessionId } = use(params)
   const router = useRouter()
+  const scanningRef = useRef(false)
   const [employeeName, setEmployeeName] = useState('')
   const [scanMode, setScanMode] = useState<'scanner' | 'manual'>('scanner')
   const [scannerRunning, setScannerRunning] = useState(true)
@@ -91,11 +92,14 @@ getSupabase()
   }
 
   const handleScan = useCallback(async (code: string) => {
+    if (scanningRef.current) return
+    scanningRef.current = true
     setError('')
     setSaved(false)
     setSearchInput(code)
     setQuantity(1)
     await lookupProduct(code)
+    scanningRef.current = false
   }, [])
 
   async function handleManualSearch() {
@@ -150,6 +154,7 @@ getSupabase()
         setQuantity(1)
         setSaved(false)
         setScannerRunning(true)
+        scanningRef.current = false
       }, 1200)
     }
     setSaving(false)
