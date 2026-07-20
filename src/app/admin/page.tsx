@@ -174,16 +174,20 @@ export default function AdminPage() {
     }
     const errors: string[] = []
     let ok = 0
+    const chunkSize = 500
+    const data = products.map((p) => ({
+      code: p.code,
+      barcode: p.barcode || null,
+      description: p.description,
+    }))
 
-    for (const p of products) {
-      const { error } = await getSupabase().from('products').upsert(
-        { code: p.code, barcode: p.barcode || null, description: p.description },
-        { onConflict: 'code' }
-      )
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const chunk = data.slice(i, i + chunkSize)
+      const { error } = await getSupabase().from('products').upsert(chunk, { onConflict: 'code' })
       if (error) {
-        errors.push(`${p.code}: ${error.message}`)
+        errors.push(`Lote ${i / chunkSize + 1}: ${error.message}`)
       } else {
-        ok++
+        ok += chunk.length
       }
     }
 
