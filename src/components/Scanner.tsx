@@ -15,6 +15,13 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
   const [starting, setStarting] = useState(false)
 
   useEffect(() => {
+    if (!running && scannerRef.current) {
+      scannerRef.current.stop().catch(() => {})
+      scannerRef.current = null
+    }
+  }, [running])
+
+  useEffect(() => {
     return () => {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {})
@@ -56,19 +63,6 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
     setStarting(false)
   }, [onScan, onError])
 
-  const stopCamera = useCallback(async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop()
-      } catch { /* ignore */ }
-      scannerRef.current = null
-    }
-  }, [])
-
-  if (!running) {
-    return null
-  }
-
   return (
     <div className="relative">
       <div
@@ -77,7 +71,7 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
         style={{ minHeight: '200px', maxHeight: '220px' }}
       />
 
-      {!scannerRef.current && !starting && !cameraError && (
+      {running && !scannerRef.current && !starting && !cameraError && (
         <button
           onClick={startCamera}
           className="mt-3 w-full py-3 bg-blue-600 text-white rounded-xl font-medium active:scale-[0.98]"
@@ -90,13 +84,10 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
         <p className="text-sm text-gray-500 text-center mt-2">Iniciando cámara...</p>
       )}
 
-      {scannerRef.current && (
-        <button
-          onClick={stopCamera}
-          className="mt-2 w-full py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:scale-[0.98]"
-        >
-          Detener cámara
-        </button>
+      {running && scannerRef.current && (
+        <p className="text-xs text-gray-400 text-center mt-2">
+          Enfoca el código de barras en el recuadro
+        </p>
       )}
 
       {cameraError && (

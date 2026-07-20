@@ -94,6 +94,7 @@ getSupabase()
   const handleScan = useCallback(async (code: string) => {
     if (scanningRef.current) return
     scanningRef.current = true
+    setScannerRunning(false)
     setError('')
     setSaved(false)
     setSearchInput(code)
@@ -154,7 +155,6 @@ getSupabase()
         setQuantity(1)
         setSaved(false)
         setScannerRunning(true)
-        scanningRef.current = false
       }, 1200)
     }
     setSaving(false)
