@@ -27,10 +27,6 @@ export default function ProductCard({
   saving,
   saved,
 }: ProductCardProps) {
-  const total = saveMode === 'add' && existingCount !== null
-    ? existingCount + quantity
-    : quantity
-
   return (
     <div className="bg-white rounded-xl shadow-lg p-5 border border-blue-100">
       <div className="mb-3">
@@ -54,11 +50,6 @@ export default function ProductCard({
         <div className="bg-gray-50 rounded-xl p-3 mb-4 text-sm">
           <span className="text-gray-500">Conteo actual: </span>
           <span className="font-bold text-gray-800">{existingCount}</span>
-          {saveMode === 'add' && (
-            <span className="text-gray-500 ml-2">
-              → Total: <span className="font-bold text-blue-600">{total}</span>
-            </span>
-          )}
         </div>
       )}
 
@@ -112,7 +103,7 @@ export default function ProductCard({
             : 'bg-blue-600 text-white hover:bg-blue-700'
         } disabled:opacity-50`}
       >
-        {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar'}
+        {saving ? 'Guardando...' : saved ? `✓ ${existingCount ?? quantity}` : 'Guardar'}
       </button>
     </div>
   )
