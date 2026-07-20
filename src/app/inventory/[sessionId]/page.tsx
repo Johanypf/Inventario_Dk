@@ -149,11 +149,12 @@ export default function InventoryPage({
     setError('')
 
     if (saveMode === 'add' && existingCount !== null) {
-      const newQty = existingCount + quantity
-      const { error: err } = await getSupabase().from('counts')
-        .update({ quantity: newQty })
-        .eq('session_id', sessionId)
-        .eq('product_id', product.id)
+      const { data: newQty, error: err } = await getSupabase().rpc('increment_count', {
+        p_session_id: sessionId,
+        p_product_id: product.id,
+        p_quantity: quantity,
+        p_scanned_by: employeeName,
+      })
 
       if (err) {
         playError()
@@ -161,8 +162,8 @@ export default function InventoryPage({
       } else {
         playSuccess()
         setSaved(true)
-        countsCache.current[product.id] = newQty
-        setExistingCount(newQty)
+        countsCache.current[product.id] = newQty as number
+        setExistingCount(newQty as number)
         setTimeout(() => {
           setProduct(null)
           productIdRef.current = null
@@ -173,16 +174,12 @@ export default function InventoryPage({
         }, 1200)
       }
     } else {
-      const { error: err } = await getSupabase().from('counts')
-        .upsert(
-          {
-            session_id: sessionId,
-            product_id: product.id,
-            quantity,
-            scanned_by: employeeName,
-          },
-          { onConflict: 'session_id,product_id' }
-        )
+      const { data: newQty, error: err } = await getSupabase().rpc('set_count', {
+        p_session_id: sessionId,
+        p_product_id: product.id,
+        p_quantity: quantity,
+        p_scanned_by: employeeName,
+      })
 
       if (err) {
         playError()
@@ -190,8 +187,8 @@ export default function InventoryPage({
       } else {
         playSuccess()
         setSaved(true)
-        countsCache.current[product.id] = quantity
-        setExistingCount(quantity)
+        countsCache.current[product.id] = newQty as number
+        setExistingCount(newQty as number)
         setTimeout(() => {
           setProduct(null)
           productIdRef.current = null
