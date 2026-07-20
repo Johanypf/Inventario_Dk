@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, use, useRef } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import { Product } from '@/lib/types'
@@ -30,7 +30,6 @@ export default function InventoryPage({
   const [existingCount, setExistingCount] = useState<number | null>(null)
   const [saveMode, setSaveMode] = useState<'set' | 'add'>('add')
   const productIdRef = useRef<number | null>(null)
-  const countsCache = useRef<Record<number, number>>({})
 
   useEffect(() => {
     const name = localStorage.getItem('dk_employee_name')
@@ -57,11 +56,8 @@ export default function InventoryPage({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
         (payload) => {
-          const pid = payload.new.product_id as number
-          const qty = payload.new.quantity as number
-          countsCache.current[pid] = qty
-          if (pid === productIdRef.current) {
-            setExistingCount(qty)
+          if (payload.new.product_id === productIdRef.current) {
+            setExistingCount(payload.new.quantity as number)
           }
         }
       )
@@ -69,11 +65,8 @@ export default function InventoryPage({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
         (payload) => {
-          const pid = payload.new.product_id as number
-          const qty = payload.new.quantity as number
-          countsCache.current[pid] = qty
-          if (pid === productIdRef.current) {
-            setExistingCount(qty)
+          if (payload.new.product_id === productIdRef.current) {
+            setExistingCount(payload.new.quantity as number)
           }
         }
       )
@@ -81,7 +74,7 @@ export default function InventoryPage({
     return () => { getSupabase().removeChannel(channel) }
   }, [sessionId])
 
-  const handleScan = useCallback(async (code: string) => {
+  async function handleScan(code: string) {
     if (scanningRef.current) return
     scanningRef.current = true
     setScannerRunning(false)
@@ -89,52 +82,72 @@ export default function InventoryPage({
     setSaved(false)
     setSearchInput(code)
     setQuantity(1)
-    await lookupProduct(code)
+    setSearching(true)
+    setProduct(null)
+    setExistingCount(null)
+    setSaveMode('add')
+
+    const { data: prod } = await getSupabase().from('products')
+      .select('*')
+      .or(`code.eq.${code},barcode.eq.${code}`)
+      .maybeSingle()
+
+    if (prod) {
+      playSuccess()
+      const pid = prod.id
+      productIdRef.current = pid
+      setProduct(prod as Product)
+      setScannerRunning(false)
+
+      const { data: qty } = await getSupabase().rpc('get_count', {
+        p_session_id: sessionId,
+        p_product_id: pid,
+      })
+
+      if (qty !== null && qty !== undefined) {
+        setExistingCount(qty as number)
+      }
+    } else {
+      playError()
+      setError(`Producto no encontrado: "${code}"`)
+    }
+    setSearching(false)
     scanningRef.current = false
-  }, [])
+  }
 
   async function handleManualSearch() {
     if (!searchInput.trim()) return
     setError('')
     setSaved(false)
     setQuantity(1)
-    await lookupProduct(searchInput.trim())
-  }
-
-  async function lookupProduct(code: string) {
     setSearching(true)
     setProduct(null)
     setExistingCount(null)
     setSaveMode('add')
 
-    const { data } = await getSupabase().from('products')
+    const { data: prod } = await getSupabase().from('products')
       .select('*')
-      .or(`code.eq.${code},barcode.eq.${code}`)
+      .or(`code.eq.${searchInput.trim()},barcode.eq.${searchInput.trim()}`)
       .maybeSingle()
 
-    if (data) {
+    if (prod) {
       playSuccess()
-      const pid = data.id
+      const pid = prod.id
       productIdRef.current = pid
-      setProduct(data as Product)
+      setProduct(prod as Product)
       setScannerRunning(false)
 
-      if (pid in countsCache.current) {
-        setExistingCount(countsCache.current[pid])
-      } else {
-        const { data: existing } = await getSupabase().from('counts')
-          .select('quantity')
-          .eq('session_id', sessionId)
-          .eq('product_id', pid)
-          .maybeSingle()
-        if (existing) {
-          countsCache.current[pid] = existing.quantity
-          setExistingCount(existing.quantity)
-        }
+      const { data: qty } = await getSupabase().rpc('get_count', {
+        p_session_id: sessionId,
+        p_product_id: pid,
+      })
+
+      if (qty !== null && qty !== undefined) {
+        setExistingCount(qty as number)
       }
     } else {
       playError()
-      setError(`Producto no encontrado: "${code}"`)
+      setError(`Producto no encontrado: "${searchInput.trim()}"`)
     }
     setSearching(false)
   }
@@ -158,7 +171,6 @@ export default function InventoryPage({
       } else {
         playSuccess()
         setSaved(true)
-        countsCache.current[product.id] = newQty as number
         setExistingCount(newQty as number)
         setTimeout(() => {
           setProduct(null)
@@ -183,7 +195,6 @@ export default function InventoryPage({
       } else {
         playSuccess()
         setSaved(true)
-        countsCache.current[product.id] = newQty as number
         setExistingCount(newQty as number)
         setTimeout(() => {
           setProduct(null)

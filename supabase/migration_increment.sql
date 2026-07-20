@@ -1,3 +1,20 @@
+-- Función para obtener conteo (usando POST, evita caché Safari)
+CREATE OR REPLACE FUNCTION get_count(
+  p_session_id UUID,
+  p_product_id BIGINT
+) RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_quantity INTEGER;
+BEGIN
+  SELECT quantity INTO v_quantity
+  FROM counts
+  WHERE session_id = p_session_id AND product_id = p_product_id;
+  RETURN v_quantity;
+END;
+$$;
+
 -- Función para incrementar conteo atómicamente (evita race conditions)
 CREATE OR REPLACE FUNCTION increment_count(
   p_session_id UUID,
