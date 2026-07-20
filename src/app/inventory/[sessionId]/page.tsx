@@ -30,6 +30,7 @@ export default function InventoryPage({
   const [existingCount, setExistingCount] = useState<number | null>(null)
   const [saveMode, setSaveMode] = useState<'set' | 'add'>('add')
   const productIdRef = useRef<string | null>(null)
+  const countsCache = useRef<Record<number, number>>({})
 
   useEffect(() => {
     const name = localStorage.getItem('dk_employee_name')
@@ -56,8 +57,11 @@ export default function InventoryPage({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
         (payload) => {
-          if (payload.new.product_id === productIdRef.current) {
-            setExistingCount(payload.new.quantity as number)
+          const pid = payload.new.product_id as number
+          const qty = payload.new.quantity as number
+          countsCache.current[pid] = qty
+          if (pid === productIdRef.current) {
+            setExistingCount(qty)
           }
         }
       )
@@ -65,8 +69,11 @@ export default function InventoryPage({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
         (payload) => {
-          if (payload.new.product_id === productIdRef.current) {
-            setExistingCount(payload.new.quantity as number)
+          const pid = payload.new.product_id as number
+          const qty = payload.new.quantity as number
+          countsCache.current[pid] = qty
+          if (pid === productIdRef.current) {
+            setExistingCount(qty)
           }
         }
       )
@@ -107,22 +114,28 @@ export default function InventoryPage({
 
     if (data) {
       playSuccess()
-      const pid = data.id as unknown as string
-      productIdRef.current = pid
+      const pid = data.id
+      productIdRef.current = pid as unknown as string
       setProduct(data as Product)
       setScannerRunning(false)
 
-      const { data: existing } = await getSupabase().from('counts')
+      if (pid in countsCache.current) {
+        setExistingCount(countsCache.current[pid])
+      }
+
+      getSupabase().from('counts')
         .select('quantity')
         .eq('session_id', sessionId)
         .eq('product_id', pid)
-        .order('updated_at', { ascending: false })
-        .limit(1)
         .maybeSingle()
-
-      if (existing) {
-        setExistingCount(existing.quantity)
-      }
+        .then(({ data: existing }) => {
+          if (existing) {
+            countsCache.current[pid] = existing.quantity
+            if (productIdRef.current === (pid as unknown as string)) {
+              setExistingCount(existing.quantity)
+            }
+          }
+        })
     } else {
       playError()
       setError(`Producto no encontrado: "${code}"`)
@@ -148,6 +161,7 @@ export default function InventoryPage({
       } else {
         playSuccess()
         setSaved(true)
+        countsCache.current[product.id] = newQty
         setExistingCount(newQty)
         setTimeout(() => {
           setProduct(null)
@@ -176,6 +190,7 @@ export default function InventoryPage({
       } else {
         playSuccess()
         setSaved(true)
+        countsCache.current[product.id] = quantity
         setExistingCount(quantity)
         setTimeout(() => {
           setProduct(null)
@@ -316,6 +331,20 @@ export default function InventoryPage({
             saving={saving}
             saved={saved}
           />
+          <button
+            onClick={() => {
+              setProduct(null)
+              productIdRef.current = null
+              setExistingCount(null)
+              setSearchInput('')
+              setQuantity(1)
+              setSaved(false)
+              setScannerRunning(true)
+            }}
+            className="w-full mt-2 py-2 rounded-xl text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 active:scale-[0.98] transition-all"
+          >
+            Escanear otro código
+          </button>
         </div>
       )}
 
