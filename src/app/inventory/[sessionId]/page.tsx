@@ -30,6 +30,7 @@ export default function InventoryPage({
   const [existingCount, setExistingCount] = useState<number | null>(null)
   const [saveMode, setSaveMode] = useState<'set' | 'add'>('add')
   const productIdRef = useRef<string | null>(null)
+  const countFetchId = useRef(0)
 
   useEffect(() => {
     const name = localStorage.getItem('dk_employee_name')
@@ -78,6 +79,24 @@ export default function InventoryPage({
     return () => { getSupabase().removeChannel(channel) }
   }, [sessionId])
 
+  useEffect(() => {
+    if (!product) return
+    const pid = product.id as unknown as string
+    const id = ++countFetchId.current
+    setExistingCount(null)
+    getSupabase().from('counts')
+      .select('quantity')
+      .eq('session_id', sessionId)
+      .eq('product_id', pid)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (id !== countFetchId.current) return
+        if (data) {
+          setExistingCount(data.quantity)
+        }
+      })
+  }, [product, sessionId])
+
   const handleScan = useCallback(async (code: string) => {
     if (scanningRef.current) return
     scanningRef.current = true
@@ -114,15 +133,6 @@ export default function InventoryPage({
       setProduct(data as Product)
       productIdRef.current = data.id as string
       setScannerRunning(false)
-      const { data: existing } = await getSupabase().from('counts')
-        .select('quantity')
-        .eq('session_id', sessionId)
-        .eq('product_id', data.id as string)
-        .maybeSingle()
-      if (existing) {
-        setExistingCount(existing.quantity)
-        setQuantity(1)
-      }
     } else {
       playError()
       setError(`Producto no encontrado: "${code}"`)
@@ -194,14 +204,14 @@ export default function InventoryPage({
     <main className="flex-1 p-4 max-w-lg mx-auto w-full pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => router.push('/')}
-          className="text-gray-500 p-2"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
+      <button
+        onClick={() => { router.push('/') }}
+        className="text-gray-500 p-2"
+      >
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
         <div className="text-center">
           <h1 className="text-lg font-bold text-gray-900">
             {sessionInfo?.name || 'Inventario'}
