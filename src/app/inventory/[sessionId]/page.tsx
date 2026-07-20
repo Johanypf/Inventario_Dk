@@ -27,6 +27,8 @@ export default function InventoryPage({
   const [recentScans, setRecentScans] = useState<{ description: string; qty: number; time: string }[]>([])
   const [sessionInfo, setSessionInfo] = useState<{ name: string; pin: string } | null>(null)
   const [searching, setSearching] = useState(false)
+  const [existingCount, setExistingCount] = useState<number | null>(null)
+  const [saveMode, setSaveMode] = useState<'set' | 'add'>('set')
 
   useEffect(() => {
     const name = localStorage.getItem('dk_employee_name')
@@ -114,6 +116,8 @@ getSupabase()
   async function lookupProduct(code: string) {
     setSearching(true)
     setProduct(null)
+    setExistingCount(null)
+    setSaveMode('set')
 
     const { data } = await getSupabase().from('products')
       .select('*')
@@ -123,6 +127,15 @@ getSupabase()
     if (data) {
       setProduct(data as Product)
       setScannerRunning(false)
+      const { data: existing } = await getSupabase().from('counts')
+        .select('quantity')
+        .eq('session_id', sessionId)
+        .eq('product_id', data.id)
+        .maybeSingle()
+      if (existing) {
+        setExistingCount(existing.quantity)
+        setQuantity(1)
+      }
     } else {
       setError(`Producto no encontrado: "${code}"`)
     }
@@ -134,28 +147,59 @@ getSupabase()
     setSaving(true)
     setError('')
 
-    const { error: err } = await getSupabase().from('counts')
-      .upsert(
-        {
-          session_id: sessionId,
-          product_id: product.id,
-          quantity,
-          scanned_by: employeeName,
-        },
-        { onConflict: 'session_id,product_id' }
-      )
+    if (saveMode === 'add' && existingCount !== null) {
+      const newQty = existingCount + quantity
+      const { error: err } = await getSupabase().from('counts')
+        .update({ quantity: newQty })
+        .eq('session_id', sessionId)
+        .eq('product_id', product.id)
 
-    if (err) {
-      setError(err.message)
+      if (err) {
+        setError(err.message)
+      } else {
+        setSaved(true)
+        setExistingCount(newQty)
+        setRecentScans(prev => [
+          { description: product.description, qty: newQty, time: new Date().toLocaleTimeString() },
+          ...prev.slice(0, 9),
+        ])
+        setTimeout(() => {
+          setProduct(null)
+          setSearchInput('')
+          setQuantity(1)
+          setSaved(false)
+          setScannerRunning(true)
+        }, 1200)
+      }
     } else {
-      setSaved(true)
-      setTimeout(() => {
-        setProduct(null)
-        setSearchInput('')
-        setQuantity(1)
-        setSaved(false)
-        setScannerRunning(true)
-      }, 1200)
+      const { error: err } = await getSupabase().from('counts')
+        .upsert(
+          {
+            session_id: sessionId,
+            product_id: product.id,
+            quantity,
+            scanned_by: employeeName,
+          },
+          { onConflict: 'session_id,product_id' }
+        )
+
+      if (err) {
+        setError(err.message)
+      } else {
+        setSaved(true)
+        setExistingCount(quantity)
+        setRecentScans(prev => [
+          { description: product.description, qty: quantity, time: new Date().toLocaleTimeString() },
+          ...prev.slice(0, 9),
+        ])
+        setTimeout(() => {
+          setProduct(null)
+          setSearchInput('')
+          setQuantity(1)
+          setSaved(false)
+          setScannerRunning(true)
+        }, 1200)
+      }
     }
     setSaving(false)
   }
@@ -278,7 +322,10 @@ getSupabase()
             barcode={product.barcode}
             description={product.description}
             quantity={quantity}
+            existingCount={existingCount}
+            saveMode={saveMode}
             onQuantityChange={setQuantity}
+            onSaveModeChange={setSaveMode}
             onSave={handleSave}
             saving={saving}
             saved={saved}

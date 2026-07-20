@@ -5,7 +5,10 @@ interface ProductCardProps {
   barcode: string | null
   description: string
   quantity: number
+  existingCount: number | null
+  saveMode: 'set' | 'add'
   onQuantityChange: (qty: number) => void
+  onSaveModeChange: (mode: 'set' | 'add') => void
   onSave: () => void
   saving: boolean
   saved: boolean
@@ -16,11 +19,18 @@ export default function ProductCard({
   barcode,
   description,
   quantity,
+  existingCount,
+  saveMode,
   onQuantityChange,
+  onSaveModeChange,
   onSave,
   saving,
   saved,
 }: ProductCardProps) {
+  const total = saveMode === 'add' && existingCount !== null
+    ? existingCount + quantity
+    : quantity
+
   return (
     <div className="bg-white rounded-xl shadow-lg p-5 border border-blue-100">
       <div className="mb-3">
@@ -39,9 +49,22 @@ export default function ProductCard({
           </div>
         )}
       </div>
+
+      {existingCount !== null && (
+        <div className="bg-gray-50 rounded-xl p-3 mb-4 text-sm">
+          <span className="text-gray-500">Conteo actual: </span>
+          <span className="font-bold text-gray-800">{existingCount}</span>
+          {saveMode === 'add' && (
+            <span className="text-gray-500 ml-2">
+              → Total: <span className="font-bold text-blue-600">{total}</span>
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Cantidad contada
+          Cantidad
         </label>
         <input
           type="number"
@@ -54,6 +77,32 @@ export default function ProductCard({
           className="w-full text-center text-2xl font-bold py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
         />
       </div>
+
+      {existingCount !== null && (
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => onSaveModeChange('add')}
+            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${
+              saveMode === 'add'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            Sumar
+          </button>
+          <button
+            onClick={() => onSaveModeChange('set')}
+            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${
+              saveMode === 'set'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            Reemplazar
+          </button>
+        </div>
+      )}
+
       <button
         onClick={onSave}
         disabled={saving}
