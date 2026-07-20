@@ -6,6 +6,7 @@ import { getSupabase } from '@/lib/supabase'
 import { Product } from '@/lib/types'
 import Scanner from '@/components/Scanner'
 import ProductCard from '@/components/ProductCard'
+import { playSuccess, playError } from '@/lib/sound'
 
 export default function InventoryPage({
   params,
@@ -126,6 +127,7 @@ getSupabase()
       .maybeSingle()
 
     if (data) {
+      playSuccess()
       setProduct(data as Product)
       setScannerRunning(false)
       const pid = data.id as string
@@ -145,6 +147,7 @@ getSupabase()
         }
       }
     } else {
+      playError()
       setError(`Producto no encontrado: "${code}"`)
     }
     setSearching(false)
@@ -163,8 +166,10 @@ getSupabase()
         .eq('product_id', product.id)
 
       if (err) {
+        playError()
         setError(err.message)
       } else {
+        playSuccess()
         setSaved(true)
         setExistingCount(newQty)
         countsCache.current[product.id] = newQty
@@ -193,8 +198,10 @@ getSupabase()
         )
 
       if (err) {
+        playError()
         setError(err.message)
       } else {
+        playSuccess()
         setSaved(true)
         setExistingCount(quantity)
         countsCache.current[product.id] = quantity
