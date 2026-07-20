@@ -219,9 +219,6 @@ getSupabase()
             onError={(msg) => setError(msg)}
             running={scannerRunning && !product}
           />
-          <p className="text-xs text-gray-400 text-center mt-2">
-            Enfoca el código de barras en el recuadro
-          </p>
         </div>
       )}
 

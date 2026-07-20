@@ -43,11 +43,11 @@ export default function Scanner({ onScan, onError, running }: ScannerProps) {
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: (viewfinderWidth: number) => ({
-            width: Math.min(220, viewfinderWidth * 0.85),
+          qrbox: (w: number, h: number) => ({
+            width: Math.min(220, w * 0.85),
             height: 90,
-            x: (viewfinderWidth - Math.min(220, viewfinderWidth * 0.85)) / 2,
-            y: 10,
+            x: (w - Math.min(220, w * 0.85)) / 2,
+            y: Math.max(5, h * 0.03),
           }),
         },
         (decodedText) => {
