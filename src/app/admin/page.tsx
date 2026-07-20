@@ -101,6 +101,7 @@ export default function AdminPage() {
       const { data } = await getSupabase().from('sessions')
         .select('*')
         .order('created_at', { ascending: false })
+        .limit(50)
       if (data) setSessions(data)
     } catch (e) {
       console.error('Error cargando sesiones:', e)
@@ -364,7 +365,7 @@ export default function AdminPage() {
           {/* Sessions list */}
           <div className="mb-4">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Sesiones activas
+              Sesiones
             </h2>
             <div className="space-y-2">
               {sessions.map((s) => (
@@ -391,8 +392,8 @@ export default function AdminPage() {
                       </span>
                     </div>
                   </button>
-                  {s.status === 'active' && (
-                    <div className="px-4 pb-3">
+                  <div className="px-4 pb-3 flex gap-2">
+                    {s.status === 'active' ? (
                       <button
                         onClick={async () => {
                           if (confirm(`¿Finalizar la sesión "${s.name}"?`)) {
@@ -402,12 +403,24 @@ export default function AdminPage() {
                             loadSessions()
                           }
                         }}
-                        className="w-full py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:scale-[0.98]"
+                        className="flex-1 py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:scale-[0.98]"
                       >
                         Finalizar
                       </button>
-                    </div>
-                  )}
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          if (confirm(`¿Eliminar la sesión "${s.name}" y todos sus datos?`)) {
+                            await getSupabase().from('sessions').delete().eq('id', s.id)
+                            loadSessions()
+                          }
+                        }}
+                        className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium active:scale-[0.98]"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
               {sessions.length === 0 && (
