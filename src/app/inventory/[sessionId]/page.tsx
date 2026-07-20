@@ -30,7 +30,6 @@ export default function InventoryPage({
   const [existingCount, setExistingCount] = useState<number | null>(null)
   const [saveMode, setSaveMode] = useState<'set' | 'add'>('add')
   const productIdRef = useRef<string | null>(null)
-  const countFetchId = useRef(0)
 
   useEffect(() => {
     const name = localStorage.getItem('dk_employee_name')
@@ -40,7 +39,6 @@ export default function InventoryPage({
       return
     }
     setEmployeeName(name)
-
     getSupabase()
       .from('sessions')
       .select('name, pin')
@@ -58,8 +56,7 @@ export default function InventoryPage({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
         (payload) => {
-          const pid = payload.new.product_id as string
-          if (pid === productIdRef.current) {
+          if (payload.new.product_id === productIdRef.current) {
             setExistingCount(payload.new.quantity as number)
           }
         }
@@ -68,34 +65,14 @@ export default function InventoryPage({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'counts', filter: `session_id=eq.${sessionId}` },
         (payload) => {
-          const pid = payload.new.product_id as string
-          if (pid === productIdRef.current) {
+          if (payload.new.product_id === productIdRef.current) {
             setExistingCount(payload.new.quantity as number)
           }
         }
       )
       .subscribe()
-
     return () => { getSupabase().removeChannel(channel) }
   }, [sessionId])
-
-  useEffect(() => {
-    if (!product) return
-    const pid = product.id as unknown as string
-    const id = ++countFetchId.current
-    setExistingCount(null)
-    getSupabase().from('counts')
-      .select('quantity')
-      .eq('session_id', sessionId)
-      .eq('product_id', pid)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (id !== countFetchId.current) return
-        if (data) {
-          setExistingCount(data.quantity)
-        }
-      })
-  }, [product, sessionId])
 
   const handleScan = useCallback(async (code: string) => {
     if (scanningRef.current) return
@@ -130,9 +107,22 @@ export default function InventoryPage({
 
     if (data) {
       playSuccess()
+      const pid = data.id as unknown as string
+      productIdRef.current = pid
       setProduct(data as Product)
-      productIdRef.current = data.id as string
       setScannerRunning(false)
+
+      const { data: existing } = await getSupabase().from('counts')
+        .select('quantity')
+        .eq('session_id', sessionId)
+        .eq('product_id', pid)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existing) {
+        setExistingCount(existing.quantity)
+      }
     } else {
       playError()
       setError(`Producto no encontrado: "${code}"`)
@@ -326,20 +316,6 @@ export default function InventoryPage({
             saving={saving}
             saved={saved}
           />
-          <button
-            onClick={() => {
-              setProduct(null)
-              productIdRef.current = null
-              setExistingCount(null)
-              setSearchInput('')
-              setQuantity(1)
-              setSaved(false)
-              setScannerRunning(true)
-            }}
-            className="w-full mt-2 py-3 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 active:scale-[0.98] transition-all"
-          >
-            Escanear otro código
-          </button>
         </div>
       )}
 
